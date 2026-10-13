@@ -1,6 +1,6 @@
 import {
   SEASON_START, SEASON_END, STAGES, FOREST_NAMES, doyOf, dateOf, stageOf, samples, colorOn, peakWindow,
-  peepScore, weatherFactor, crowdFactor, envFor, makeReports,
+  peepScore, weatherFactor, crowdFactor, envFor, makeReports, makeAgency, combine,
 } from './model.js';
 import { REPO } from './config.js';
 
@@ -20,7 +20,7 @@ const store = {
 // ---------- state ----------
 const today = new Date();
 const todayDoy = doyOf(today);
-let M, G, W, R, meta, year;
+let M, G, W, R, A, C, meta, year; // C: agency + reports corrections combined
 let day;                      // day of year being planned for
 let items = [];               // trails, overlooks and drives, each with precomputed color samples
 let grandma = store.get('hnp.grandma', false);
@@ -67,12 +67,13 @@ async function getJSON(path, fallback) {
 }
 
 async function init() {
-  let trails, overlooks, drives, reports, states;
+  let trails, overlooks, drives, reports, states, agency;
   try {
-    [M, G, trails, overlooks, drives, W, reports, meta, states] = await Promise.all([
+    [M, G, trails, overlooks, drives, W, reports, meta, states, agency] = await Promise.all([
       getJSON('data/model.json'), getJSON('data/grid.json'), getJSON('data/trails.json'),
       getJSON('data/overlooks.json', []), getJSON('data/drives.json', []), getJSON('data/weather.json', null),
       getJSON('data/reports.json', []), getJSON('data/meta.json', {}), getJSON('data/states.json', null),
+      getJSON('data/agency.json', null),
     ]);
   } catch (err) {
     $('#loading').textContent = 'Could not load the forecast data. Try reloading the page.';
@@ -83,11 +84,14 @@ async function init() {
   if (states) {
     L.geoJSON(states, { interactive: false, style: { color: cssVar('--pine'), weight: 1.2, fill: false, opacity: 0.6 } }).addTo(map);
   }
-  R = makeReports(M, W, reports, gridSiteAt, today);
+  M.agency ??= { radiusKm: 12, weight: 0.5 };
+  A = makeAgency(M, W, agency, gridSiteAt);
+  R = makeReports(M, W, reports, gridSiteAt, today, A);
+  C = combine(A, R);
 
   const prep = (it, kind) => {
     it.kind = kind;
-    it.env = envFor(M, W, R, it.lat, it.lon);
+    it.env = envFor(M, W, C, it.lat, it.lon);
     it.smp = samples(M, it, it.env);
     it.win = peakWindow(M, it.smp);
     it.view = kind !== 'trail' || it.v.length > 0 || it.pk.length > 0;
@@ -148,7 +152,7 @@ function computeGrid() {
     const r = Math.floor(i / G.ncols), c = i % G.ncols;
     const lat = G.lat1 - (r + 0.5) * G.step, lon = G.lon0 + (c + 0.5) * G.step;
     const site = { lat, elev: cell[0], c: cell[1], f: cell[2] };
-    const smp = samples(M, site, envFor(M, W, R, lat, lon));
+    const smp = samples(M, site, envFor(M, W, C, lat, lon));
     return { smp, win: peakWindow(M, smp) };
   });
 }
@@ -384,21 +388,32 @@ function renderSpot() {
   const { site, g } = p;
   const st = stageOf(day - g.win.peak);
   const forest = site.f.filter(([, f]) => f >= 0.15).map(([c]) => FOREST_NAMES[c] || 'Other').join(', ');
-  const env = envFor(M, W, R, spot.lat, spot.lon);
+  const env = envFor(M, W, C, spot.lat, spot.lon);
   box.innerHTML = `
     <h3><span class="chip st-${st[0]}">${esc(st[1])}</span> on ${fmtDate(dateOf(day, year))}</h3>
     <p>Peak around <b>${fmtDate(dateOf(g.win.peak, year))}</b>, best from ${fmtDate(dateOf(g.win.from, year))} to ${fmtDate(dateOf(g.win.to, year))}.</p>
     <p>About ${ft(site.elev)} ft up. ${esc(forest || 'Mostly open land')}.</p>
-    <p>${seasonSentence(env)}</p>`;
+    <p>${seasonSentence(env, spot.lat, spot.lon)}</p>${agencyLine(spot.lat, spot.lon)}`;
 }
 
-function seasonSentence(env) {
+function agencyLine(lat, lon) {
+  const pk = A?.peakNear(lat, lon);
+  if (pk == null) return '';
+  return `<p>${esc(A.source)} predicts peak around <b>${fmtDate(dateOf(Math.round(pk), year))}</b> here; this forecast leans halfway toward theirs.</p>`;
+}
+
+function seasonSentence(env, lat, lon) {
   if (!W) return '';
   const parts = [];
   const shift = Math.round(env.shift + env.corr);
   if (Math.abs(env.weather.anomF) >= 1) parts.push(`${env.weather.anomF > 0 ? 'warmer' : 'cooler'} than normal by ${Math.abs(env.weather.anomF).toFixed(1)}°F`);
   if (env.weather.rain < M.drought.ratio) parts.push(`dry (${Math.round(env.weather.rain * 100)}% of normal rain)`);
-  if (Math.abs(env.corr) >= 1) parts.push('adjusted by nearby color reports');
+  if (Math.abs(env.corr) >= 1 && lat != null) {
+    const src = [];
+    if (Math.abs(A.correctionAt(lat, lon)) >= 0.5) src.push(`${A.source}'s forecast`);
+    if (Math.abs(R.correctionAt(lat, lon)) >= 0.5) src.push('color reports nearby');
+    if (src.length) parts.push(`adjusted toward ${src.join(' and ')}`);
+  }
   if (!parts.length) return 'This season is close to normal here.';
   const dir = shift === 0 ? 'about on schedule' : `${Math.abs(shift)} day${Math.abs(shift) === 1 ? '' : 's'} ${shift < 0 ? 'earlier' : 'later'} than usual`;
   return `This season: ${parts.join(', ')}, so color is running ${dir}.`;
@@ -697,7 +712,8 @@ function renderDetail(it) {
         <p>Best from <b>${fmtDate(dateOf(w.from, year))}</b> to <b>${fmtDate(dateOf(w.to, year))}</b>, peaking around <b>${fmtDate(dateOf(w.peak, year))}</b>.${spread}</p>
         ${curveSVG(it)}
         <div class="curve-axis"><span>Sep 1</span><span>Oct 1</span><span>Nov 1</span></div>
-        <p style="margin-top:6px">${seasonSentence(it.env)}</p>
+        <p style="margin-top:6px">${seasonSentence(it.env, it.lat, it.lon)}</p>
+        ${agencyLine(it.lat, it.lon)}
       </div>
       ${days}
       ${comfort.length ? `<ul class="comfort">${comfort.map(([t, ok]) => `<li class="${ok ? '' : 'no'}">${esc(t)}</li>`).join('')}</ul>` : ''}
@@ -744,6 +760,10 @@ function fillAbout() {
     const avg = W.points.reduce((s, p) => s + p.anomF, 0) / W.points.length;
     const dry = W.points.filter(p => p.rain < M.drought.ratio).length;
     $('#season-note').textContent = `So far this season New England is averaging ${Math.abs(avg).toFixed(1)}°F ${avg >= 0 ? 'warmer' : 'cooler'} than normal${dry ? `, and ${Math.round((100 * dry) / W.points.length)}% of the region is in a dry spell` : ''}.`;
+  }
+  if (A?.pts.length) {
+    const avg = A.pts.reduce((s, p) => s + p.resid, 0) / A.pts.length;
+    $('#agency-note').textContent = `This season DCR's dates average ${Math.abs(avg).toFixed(0)} days ${avg >= 0 ? 'later' : 'earlier'} than our own model across ${A.pts.length} areas.`;
   }
   if (meta?.updated) {
     $('#updated').textContent = `Weather and reports last updated ${new Date(meta.updated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}. ${meta.reports ? `${meta.reports} color reports in the last month.` : ''}`;

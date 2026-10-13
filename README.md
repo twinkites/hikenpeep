@@ -25,8 +25,9 @@ To run it locally, serve the folder with any static server (`python3 -m http.ser
    `pipeline/calibrate.py` fits the latitude, elevation and coast slopes to about 2,500 USA National Phenology Network observations of red and sugar maples in New England (2010–2025). Each slope is blended with a prior from regional foliage reporting. The intercept (October 12 at 42°N and 1,000 ft) is a prior: NPN's "colored leaves" period describes single trees, not a hillside at its best. With the current fit, color comes about 7 days earlier per 1,000 ft and 2 days earlier per degree north.
 2. **Forest type.** The USDA Forest Service BIGMAP forest type group raster (30 m, sampled at about 300 m) shifts timing by type and sets how vivid a place can get. Maple, beech and birch are the baseline. Oak and hickory peak about 6 days later and are less vivid; spruce and fir add little color.
 3. **This season.** `pipeline/daily.py` compares this season's temperatures and rainfall with a 2016–2025 climatology from Open-Meteo, at 52 points across the region. Each °F warmer than normal over September 1 to October 20 (including the next 7 days of forecast) delays peak by 1.2 days, capped at −6 to +9 days. Less than 60% of normal rain over the last 60 days brings peak 3 days earlier and makes color 15% less vivid.
-4. **Reports.** Each report implies a peak date: "near peak" means about 4 days away, "past peak" about 6 days ago, and so on. The difference from the model is spread over about 30 km with a Gaussian weight, and shrunk toward zero (`Σw·Δ / (Σw + 1)`), so one report moves the forecast only part of the way.
-5. **Scores.** A hike's elevation range is split into quantiles and crossed with its forest mix, and each piece gets its own peak date. Its color on a day is the weighted share of those pieces near peak, using a curve that rises over about 9 days and falls over about 6.5. Score = 100 × color × (0.35 + 0.65 × vividness), × 0.85 when there's no view or summit. In the two-week planner, a 100% chance of rain cuts the score by 45%, full cloud by 15%, weekends by 7–15%, and Indigenous Peoples' Day weekend by 15–25%. Popular hikes take the larger crowd penalties.
+4. **State forecasts.** In Massachusetts, the Department of Conservation and Recreation publishes a week-by-week stage forecast for about 700 forest-type polygons (the [interactive fall foliage map](https://www.mass.gov/news/dcr-unveils-2026-interactive-fall-foliage-map); data from the `Foliage_Predictions` ArcGIS layer). `daily.py` turns each polygon's forecast into a peak date (the middle of its "Peak" weeks), pooled into about 185 points. Within about 12 km of those points, the model moves halfway toward DCR's date. At the start of the 2026 season, DCR's dates were about 9 days later than our model on average, so this shift is noticeable in eastern Massachusetts.
+5. **Reports.** Each report implies a peak date: "near peak" means about 4 days away, "past peak" about 6 days ago, and so on. The difference from the model is spread over about 30 km with a Gaussian weight, and shrunk toward zero (`Σw·Δ / (Σw + 1)`), so one report moves the forecast only part of the way.
+6. **Scores.** A hike's elevation range is split into quantiles and crossed with its forest mix, and each piece gets its own peak date. Its color on a day is the weighted share of those pieces near peak, using a curve that rises over about 9 days and falls over about 6.5. Score = 100 × color × (0.35 + 0.65 × vividness), × 0.85 when there's no view or summit. In the two-week planner, a 100% chance of rain cuts the score by 45%, full cloud by 15%, weekends by 7–15%, and Indigenous Peoples' Day weekend by 15–25%. Popular hikes take the larger crowd penalties.
 
 The model runs in the browser (`js/model.js`), so the map, list and details always agree. `node --test tests/` checks it against normal-year peak windows for seven reference places, and both workflows run these checks before committing.
 
@@ -68,12 +69,13 @@ css/style.css              styles
 js/app.js                  map, outlook, hike list, detail view, grandma mode
 js/model.js                the foliage model (pure functions)
 js/config.js               GitHub repo for color reports
+img/twinkites-logo.png     Twin Kites mark (used as a CSS mask so it follows the theme)
 data/                      everything the page loads (written by the pipeline)
 pipeline/build_static.py   trails, overlooks, drives, forecast grid
 pipeline/osm_extract.py    reads Geofabrik extracts with pyosmium
 pipeline/calibrate.py      fits the model to NPN observations
 pipeline/climatology.py    10-year weather normals (writes pipeline/climatology.json)
-pipeline/daily.py          nightly weather and color reports
+pipeline/daily.py          nightly weather, color reports and the Massachusetts DCR forecast
 pipeline/curated/          scenic drives and classic hikes, written by hand
 tests/model.test.mjs       model sanity checks (node --test tests/)
 .github/workflows/         nightly and monthly data jobs
@@ -86,6 +88,6 @@ AllTrails has no public API, and its terms don't allow scraping. Hike and Peep b
 
 ## Credits
 
-Trails, parks and points of interest © OpenStreetMap contributors (ODbL), via Geofabrik. Base map © OpenStreetMap contributors. Forest type groups: USDA Forest Service FIA BIGMAP. Elevation: Terrain Tiles on AWS (USGS 3DEP and others). Weather: Open-Meteo (CC BY 4.0), including ERA5 reanalysis. Phenology: USA National Phenology Network. Driving routes: OSRM. State outlines: US Census Bureau TIGERweb. Place search by Nominatim.
+Trails, parks and points of interest © OpenStreetMap contributors (ODbL), via Geofabrik. Base map © OpenStreetMap contributors. Forest type groups: USDA Forest Service FIA BIGMAP. Elevation: Terrain Tiles on AWS (USGS 3DEP and others). Weather: Open-Meteo (CC BY 4.0), including ERA5 reanalysis. Massachusetts foliage forecast: Department of Conservation and Recreation. Phenology: USA National Phenology Network. Driving routes: OSRM. State outlines: US Census Bureau TIGERweb. Place search by Nominatim.
 
 © Twin Kites LLC, [twinkites.com](https://twinkites.com)

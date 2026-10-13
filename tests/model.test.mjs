@@ -89,3 +89,14 @@ test('a peak report pulls nearby forecasts toward it, a little', () => {
   assert.ok(Math.abs(corr) < Math.abs(implied - model) + 0.01);
   assert.equal(R.correctionAt(42, -73), 0); // far away: no effect
 });
+
+test('an agency forecast pulls nearby places halfway, and fades with distance', async () => {
+  const { makeAgency } = await import('../js/model.js');
+  const site = { lat: 42.3, elev: 60, c: 20, f: [[800, 1]] };
+  const env = { shift: 0, vivid: 1, corr: 0 };
+  const model = peakWindow(M, samples(M, site, env)).peak;
+  const A = makeAgency(M, null, { points: [[42.3, -71.5, model + 8]] }, () => site);
+  assert.ok(Math.abs(A.correctionAt(42.3, -71.5) - 8 * M.agency.weight) < 0.01);
+  assert.ok(A.correctionAt(42.3, -71.3) < A.correctionAt(42.3, -71.5));
+  assert.equal(A.correctionAt(44, -71.5), 0);
+});

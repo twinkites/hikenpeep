@@ -339,7 +339,17 @@ body.grandma .hike-only { display: none !important; }
 
 .foot { margin-top: auto; padding-top: 28px; font-size: 0.83em; color: var(--ink-soft); }
 .foot p { margin: 0; }
-.foot .copyright { margin-top: 8px; }
+/* The Twin Kites mark is drawn as a mask so it takes the text color in light and dark themes. */
+.brand { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; color: var(--ink-soft); text-decoration: none; }
+.brand:hover span:last-child { text-decoration: underline; }
+.tk-logo {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  background: var(--ink);
+  -webkit-mask: url(../img/twinkites-logo.png) center / contain no-repeat;
+  mask: url(../img/twinkites-logo.png) center / contain no-repeat;
+}
 
 /* ---------- map ---------- */
 .map-wrap { position: relative; }

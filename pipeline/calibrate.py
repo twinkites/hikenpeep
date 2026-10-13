@@ -38,6 +38,7 @@ MODEL = {
     'tempSens': 1.2,          # prior: days later per °F the late season runs warm
     'tempCap': [-6, 9],
     'drought': {'ratio': 0.6, 'days': -3, 'intensity': 0.85},
+    'agency': {'radiusKm': 12, 'weight': 0.5},  # how far to trust a state agency's own forecast
     'reports': {'radiusKm': 30, 'maxAgeDays': 12,
                 'stages': {'green': 14, 'patchy': 9, 'near': 4, 'peak': 0, 'past': -6, 'bare': -14}},
 }

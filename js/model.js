@@ -162,11 +162,54 @@ export function envFor(M, W, R, lat, lon) {
 }
 
 /**
+ * Blends toward a state agency's own forecast where one exists (today: Massachusetts DCR).
+ * Each agency point says "peak here on day X"; the model moves `weight` of the way there,
+ * fading out over radiusKm from the agency's points.
+ */
+export function makeAgency(M, W, agency, gridSiteAt) {
+  const pts = [];
+  for (const [lat, lon, pk] of agency?.points || []) {
+    const site = gridSiteAt(lat, lon);
+    if (!site) continue;
+    const modelPeak = peakWindow(M, samples(M, site, envFor(M, W, null, lat, lon))).peak;
+    pts.push({ lat, lon, pk, resid: clamp(pk - modelPeak, -15, 15) });
+  }
+  const { radiusKm, weight } = M.agency;
+  return {
+    source: agency?.source, pts,
+    correctionAt(lat, lon) {
+      let sw = 0, s = 0;
+      for (const p of pts) {
+        const d = distKm(lat, lon, p.lat, p.lon);
+        if (d > radiusKm * 2.5) continue;
+        const w = Math.exp(-((d / radiusKm) ** 2));
+        sw += w; s += w * p.resid;
+      }
+      return sw ? (weight * Math.min(1, sw) * s) / sw : 0;
+    },
+    /** The agency's own peak date near here, if it has one within radiusKm. */
+    peakNear(lat, lon) {
+      let best = null;
+      for (const p of pts) {
+        const d = distKm(lat, lon, p.lat, p.lon);
+        if (d <= radiusKm && (!best || d < best.d)) best = { d, pk: p.pk };
+      }
+      return best?.pk ?? null;
+    },
+  };
+}
+
+/** Agency forecasts first, then visitors' reports measured against the blended result. */
+export function combine(...parts) {
+  return { correctionAt: (lat, lon) => parts.reduce((s, p) => s + (p ? p.correctionAt(lat, lon) : 0), 0) };
+}
+
+/**
  * Turns color reports into a smooth correction (days) to add to the model.
  * Each report implies a peak date; the difference from the model is spread over nearby
  * places, shrunk toward zero when there are only a few reports.
  */
-export function makeReports(M, W, reports, gridSiteAt, today) {
+export function makeReports(M, W, reports, gridSiteAt, today, agency = null) {
   const todayDoy = doyOf(today);
   const used = [];
   for (const r of reports || []) {
@@ -175,7 +218,7 @@ export function makeReports(M, W, reports, gridSiteAt, today) {
     if (age < 0 || age > M.reports.maxAgeDays) continue;
     const site = gridSiteAt(r.lat, r.lon);
     if (!site) continue;
-    const env = envFor(M, W, null, r.lat, r.lon);
+    const env = envFor(M, W, agency, r.lat, r.lon);
     const s = samples(M, site, env);
     const modelPeak = peakWindow(M, s).peak;
     const implied = d + M.reports.stages[r.stage];

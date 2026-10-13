@@ -145,11 +145,78 @@ def build_reports(today):
     return out
 
 
+# ---------- Massachusetts DCR foliage forecast ----------
+# DCR publishes week-by-week predicted stages for forest-type polygons across the state
+# (https://www.mass.gov/info-details/fall-foliage-season-in-the-parks). Each polygon's
+# predicted peak becomes a point the browser model blends toward.
+DCR_LAYER = ('https://services1.arcgis.com/7iJyYTjCtKsZS1LR/arcgis/rest/services/'
+             'Foliage_Predictions/FeatureServer/0')
+DCR_STAGES = {'No Change': None, 'Just Changing': None, 'Mid Point': None,
+              'Near Peak': 'near', 'Peak': 'peak', 'Past Peak': 'past'}
+MONTHS = {m: i for i, m in enumerate(['january', 'february', 'march', 'april', 'may', 'june', 'july',
+                                      'august', 'september', 'october', 'november', 'december'], 1)}
+
+
+def doy(d):
+    """Day of year that ignores leap days, matching js/model.js."""
+    n = d.timetuple().tm_yday
+    return n - 1 if d.year % 4 == 0 and n > 59 else n
+
+
+def build_agency(season):
+    info = get(DCR_LAYER, params={'f': 'json'}, timeout=60).json()
+    weeks = []  # (field, date) from aliases like "October 13, 2026"
+    for f in info['fields']:
+        m = re.match(r'([A-Za-z]+)\s+(\d+),\s+(\d{4})', f.get('alias') or '')
+        if f['name'].startswith('F_') and m and m.group(1).lower() in MONTHS:
+            weeks.append((f['name'], dt.date(int(m.group(3)), MONTHS[m.group(1).lower()], int(m.group(2)))))
+    if not weeks or weeks[0][1].year != season:
+        print(f'  DCR layer is not for {season}; skipping')
+        return None
+    gj = get(DCR_LAYER + '/query', timeout=120, params={
+        'where': '1=1', 'outFields': ','.join(f for f, _ in weeks) + ',Shape__Area', 'returnGeometry': 'true',
+        'outSR': 4326, 'maxAllowableOffset': 0.002, 'geometryPrecision': 4, 'f': 'geojson',
+        'resultRecordCount': 4000}).json()
+    cells = {}
+    for feat in gj['features']:
+        p = feat['properties']
+        stages = [(DCR_STAGES.get(p[f]), d) for f, d in weeks]
+        peaks = [doy(d) for s, d in stages if s == 'peak']
+        if peaks:
+            pk = sum(peaks) / len(peaks)
+        else:
+            near = [doy(d) for s, d in stages if s == 'near']
+            past = [doy(d) for s, d in stages if s == 'past']
+            if not (near and past):
+                continue
+            pk = (max(near) + min(past)) / 2
+        ring = feat['geometry']['coordinates'][0]
+        if feat['geometry']['type'] == 'MultiPolygon':
+            ring = ring[0]
+        lon = sum(c[0] for c in ring) / len(ring)
+        lat = sum(c[1] for c in ring) / len(ring)
+        key = (round(lat / 0.04), round(lon / 0.04))  # pool small polygons into ~4 km cells
+        w = max(p.get('Shape__Area') or 1, 1)
+        c = cells.setdefault(key, [0.0, 0.0, 0.0, 0.0])
+        c[0] += w * lat; c[1] += w * lon; c[2] += w * pk; c[3] += w
+    pts = [[round(a / w, 4), round(b / w, 4), round(c / w, 1)] for a, b, c, w in cells.values()]
+    print(f'  DCR: {len(gj["features"])} polygons -> {len(pts)} forecast points')
+    return {'source': 'Massachusetts DCR', 'url': 'https://www.mass.gov/info-details/fall-foliage-season-in-the-parks',
+            'weeks': [d.isoformat() for _, d in weeks], 'points': pts}
+
+
 def main():
     today = dt.date.today()
     season = season_for(today)
     weather = build_weather(today, season)
     reports = build_reports(today)
+    try:
+        agency = build_agency(season)
+    except Exception as err:  # never let a third-party layer break the nightly run
+        print(f'  DCR forecast unavailable: {err}')
+        agency = None
+    if agency:
+        write_json(DATA / 'agency.json', agency)
     clim = read_json(ROOT / 'pipeline' / 'climatology.json')
     write_json(DATA / 'weather.json', {'generated': today.isoformat(), 'season': season, 'points': weather})
     write_json(DATA / 'reports.json', reports)
