@@ -1,0 +1,5 @@
+osmium>=4.0,<5
+shapely>=2.0,<3
+numpy>=1.26
+pillow>=10
+requests>=2.31

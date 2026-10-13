@@ -1,0 +1,70 @@
+name: Monthly rebuild
+
+# Rebuilds trails, overlooks, drives and the forest/terrain grid from fresh OpenStreetMap
+# extracts, and refits the model. Each July it also refreshes the weather climatology so
+# the new season is compared with the latest ten years.
+on:
+  schedule:
+    - cron: '0 7 1 * *'
+  workflow_dispatch:
+    inputs:
+      climatology:
+        description: Also rebuild the 10-year weather climatology
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      - name: Cache terrain tiles and forest raster
+        uses: actions/cache@v4
+        with:
+          path: |
+            pipeline/.cache/terrain
+            pipeline/.cache/forest_type_groups.tif
+            pipeline/.cache/drive_routes.json
+            pipeline/.cache/states.json
+          key: static-${{ github.run_id }}
+          restore-keys: static-
+      - name: Build trails, grid, overlooks and drives
+        working-directory: pipeline
+        run: python build_static.py --refresh-osm
+      - name: Weather climatology (July, or when asked)
+        working-directory: pipeline
+        run: |
+          if [ "${{ inputs.climatology }}" = "true" ] || [ "$(date -u +%m)" = "07" ]; then
+            python climatology.py
+          else
+            echo "Skipping: climatology is refreshed each July"
+          fi
+      - name: Calibrate the model
+        working-directory: pipeline
+        run: python calibrate.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Model checks
+        run: node --test tests/
+      - name: Commit
+        run: |
+          git config user.name 'hikenpeep-bot'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data pipeline/climatology.json
+          git diff --cached --quiet || git commit -m "Monthly rebuild $(date -u +%F)"
+          git push

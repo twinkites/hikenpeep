@@ -1,0 +1,49 @@
+name: Foliage color report
+description: Tell Hike and Peep what the leaves look like somewhere in New England.
+title: 'Color report: '
+labels: [foliage-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Reports from the last 12 days nudge the forecast for everywhere within about 30 km.
+        If you came from the map, the location and date are filled in already.
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: Latitude and longitude, like 44.1612, -71.6853
+      placeholder: 44.1612, -71.6853
+    validations:
+      required: true
+  - type: input
+    id: date-seen
+    attributes:
+      label: Date seen
+      description: YYYY-MM-DD
+      placeholder: 2026-10-12
+    validations:
+      required: true
+  - type: dropdown
+    id: color-stage
+    attributes:
+      label: Color stage
+      options:
+        - Mostly green (under 10% turned)
+        - Patchy (10–30% turned)
+        - Near peak (30–70% turned)
+        - Peak (most leaves turned, few down)
+        - Past peak (many leaves down or brown)
+        - Leaves down
+    validations:
+      required: true
+  - type: input
+    id: place
+    attributes:
+      label: Place
+      description: Optional. A trail, town or landmark.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Optional. Which trees, how vivid, elevation, anything else.

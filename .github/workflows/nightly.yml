@@ -1,0 +1,46 @@
+name: Nightly forecast
+
+# Refreshes this season's weather and visitors' color reports, then commits the data.
+# Committing to main redeploys GitHub Pages.
+on:
+  schedule:
+    - cron: '20 9 * * *'   # 5:20 am Eastern (4:20 am in winter)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      - name: Fetch weather and reports
+        working-directory: pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python daily.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Model checks
+        run: node --test tests/
+      - name: Commit
+        run: |
+          git config user.name 'hikenpeep-bot'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/weather.json data/reports.json data/meta.json
+          git diff --cached --quiet || git commit -m "Nightly forecast $(date -u +%F)"
+          git push

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hike and Peep</title>
+  <meta name="description" content="When New England's fall foliage will peak, and the best day to hike each trail to see it. Includes a grandma mode for easy walks and drive-up views.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path fill='%23c4421a' d='M32 3l4 12 8-4-2 12 12-4-4 10 11 3-12 8 4 6-14-2-5 8v10h-4V54l-5-8-14 2 4-6-12-8 11-3-4-10 12 4-2-12 8 4z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Young+Serif&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="panel">
+      <header class="masthead">
+        <svg class="leaf" viewBox="0 0 64 64" aria-hidden="true"><use href="#maple"/></svg>
+        <div>
+          <h1>Hike and peep</h1>
+          <p class="lede">When New England's leaves will peak, and the best day to hike each trail to see them.</p>
+        </div>
+      </header>
+
+      <button id="grandma" class="grandma-toggle" aria-pressed="false">
+        <span class="switch" aria-hidden="true"></span>
+        <span><b>Grandma mode</b><small>Short, flat walks, drive-up overlooks and scenic drives, in bigger type</small></span>
+      </button>
+
+      <div class="when">
+        <label for="day">Planning for <output id="day-out">today</output></label>
+        <input id="day" type="range" min="244" max="324" step="1" value="280">
+        <div class="when-ends" aria-hidden="true"><span>Sep 1</span><button type="button" id="today" class="ghost">Back to today</button><span>Nov 20</span></div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-map" aria-controls="pane-map" aria-selected="true">Peak map</button>
+        <button role="tab" id="tab-hikes" aria-controls="pane-hikes" aria-selected="false" tabindex="-1">Hikes</button>
+        <button role="tab" id="tab-about" aria-controls="pane-about" aria-selected="false" tabindex="-1">How it works</button>
+      </div>
+
+      <section id="pane-map" role="tabpanel" aria-labelledby="tab-map">
+        <form id="place-form" class="row">
+          <label class="sr-only" for="place">Place</label>
+          <input id="place" type="search" placeholder="Go to a town or address" autocomplete="off">
+          <button type="submit" class="secondary">Go</button>
+          <button type="button" id="locate" class="secondary" title="Use my location" aria-label="Use my location">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </form>
+        <p id="place-status" class="status" aria-live="polite"></p>
+
+        <div id="spot" class="spot" hidden></div>
+        <p id="spot-hint" class="hint">Tap anywhere on the map to see when that spot peaks.</p>
+
+        <h2>Peak outlook</h2>
+        <p class="sub-h">Predicted peak this season, and what you'd see on the day you picked.</p>
+        <table class="outlook">
+          <thead><tr><th scope="col">Where</th><th scope="col">Peak around</th><th scope="col" id="outlook-day">That day</th></tr></thead>
+          <tbody id="outlook"></tbody>
+        </table>
+
+        <div class="report-box">
+          <h2>Seen the leaves?</h2>
+          <p>Tell us what color they are. Reports from the last two weeks nudge the forecast for everywhere nearby. You'll need a free GitHub account.</p>
+          <a id="report-link" class="secondary button" href="#" target="_blank" rel="noopener">Report color at the map center</a>
+        </div>
+      </section>
+
+      <section id="pane-hikes" role="tabpanel" aria-labelledby="tab-hikes" hidden>
+        <div id="hike-list-view">
+          <p class="grandma-only intro">Walks that are short or flat, with an easy surface, plus overlooks you can drive right up to and scenic drives. Check each one: trail data comes from volunteers and can be incomplete.</p>
+          <div class="filters">
+            <label class="field">
+              <span>Sort by</span>
+              <select id="sort">
+                <option value="day">Color on the day I picked</option>
+                <option value="soon">Best day in the next 2 weeks</option>
+                <option value="near">Closest to the map center</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>State</span>
+              <select id="state">
+                <option value="">All of New England</option>
+                <option>CT</option><option>MA</option><option>ME</option><option>NH</option><option>RI</option><option>VT</option>
+              </select>
+            </label>
+            <label class="field hike-only">
+              <span>Effort</span>
+              <select id="effort">
+                <option value="">Any</option>
+                <option value="easy">Easy: under 3 mi and 500 ft</option>
+                <option value="moderate">Moderate: under 7 mi and 1,800 ft</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <label class="field grandma-only">
+              <span>Show</span>
+              <select id="kind">
+                <option value="">Everything</option>
+                <option value="trail">Walks</option>
+                <option value="overlook">Drive-up overlooks</option>
+                <option value="drive">Scenic drives</option>
+              </select>
+            </label>
+          </div>
+          <div class="checks">
+            <label class="check"><input id="in-view" type="checkbox" checked> Only what's on the map</label>
+            <label class="check hike-only"><input id="views" type="checkbox"> Has a view or summit</label>
+            <label class="check"><input id="featured" type="checkbox"> Classics only</label>
+          </div>
+          <p id="list-count" class="status" aria-live="polite"></p>
+          <ul id="hike-list" class="results"></ul>
+          <button id="more" class="secondary wide" hidden>Show more</button>
+        </div>
+        <div id="detail" hidden></div>
+      </section>
+
+      <section id="pane-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+        <p class="intro">Hike and Peep predicts when the leaves will peak across New England, then scores every trail, overlook and scenic drive for each day of the season.</p>
+        <ol class="steps">
+          <li>
+            <h3>Where you are</h3>
+            <p>Color comes earlier the higher and farther north you go, and later near the ocean. For every 4 km grid square and every trail, we start from a normal-year peak date based on latitude, elevation (from USGS-derived terrain tiles) and distance to the coast.</p>
+            <p id="fit-note"></p>
+          </li>
+          <li>
+            <h3>What grows there</h3>
+            <p>Red maples turn first, then sugar maples, birch and beech, and oaks last. Pines and spruce barely change. The USDA Forest Service's map of forest types sets the timing and how vivid each place can get, so a maple ridge scores higher than a spruce flat.</p>
+          </li>
+          <li>
+            <h3>This year's weather</h3>
+            <p>Cool nights bring color on; a warm September holds it back, and drought makes leaves turn early and dull. Each night we compare this season's temperatures and rainfall (Open-Meteo) with the 2016–2025 average and shift the dates. <span id="season-note"></span></p>
+          </li>
+          <li>
+            <h3>What people see</h3>
+            <p>Color reports from the last 12 days pull the forecast toward what's actually on the trees within about 30 km. A single report moves it only part of the way, so one mistaken report can't swing it.</p>
+          </li>
+          <li>
+            <h3>The best day to go</h3>
+            <p>A trail's score blends how much of its forest is in color (sampled from bottom to top, since a summit can be bare while the trailhead is at peak), how vivid that forest gets, and whether it has a view. For the next two weeks we also count the chance of rain, cloud cover and weekend crowds, with an extra penalty on Indigenous Peoples' Day weekend.</p>
+          </li>
+        </ol>
+
+        <h2>Grandma mode</h2>
+        <p class="about-p">Trails count as easy when they're under about 3 miles round trip with under about 450 ft of climbing, have no rough, rocky or stepped sections, and aren't graded as mountain hiking. Paved or smooth surfaces, benches, restrooms and parking near the start, wheelchair access and loops score higher. Flat out-and-back paths of any length are included, since you can turn around whenever you like. Overlooks count if a road passes within about 100 m or a parking lot is within 150 m.</p>
+
+        <h2>Good to know</h2>
+        <ul class="sources-list">
+          <li>These are predictions. The model is typically within about a week; mountain microclimates, wind storms and early frost can make it worse.</li>
+          <li>Hikes are built from named trail segments in OpenStreetMap. A long trail is shown as one route, so some lengths are a full traverse rather than a typical hike. Distances and climbs are estimates from 30 m terrain data.</li>
+          <li>Surface, bench, restroom and accessibility details depend on volunteer mapping and are often missing. Check before you go, especially in grandma mode.</li>
+          <li>Hike and Peep doesn't use AllTrails data. The AllTrails link on each trail runs a search so you can read recent reviews and conditions there.</li>
+        </ul>
+
+        <h2>Sources</h2>
+        <ul class="sources-list">
+          <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (trails, parks, viewpoints, benches, parking), via <a href="https://download.geofabrik.de/" target="_blank" rel="noopener">Geofabrik</a></li>
+          <li>USDA Forest Service, <a href="https://data.fs.usda.gov/geodata/rastergateway/bigmap/" target="_blank" rel="noopener">BIGMAP forest type groups</a> (2018)</li>
+          <li><a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Terrain Tiles</a> on AWS, from USGS 3DEP and other sources</li>
+          <li><a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> weather forecasts and ERA5 archive (CC BY 4.0)</li>
+          <li><a href="https://www.usanpn.org/" target="_blank" rel="noopener">USA National Phenology Network</a> leaf color observations, used to calibrate the model</li>
+          <li>Routes for scenic drives from <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>; state outlines from the US Census Bureau</li>
+        </ul>
+        <p id="updated" class="note"></p>
+      </section>
+
+      <footer class="foot">
+        <p>Forecasts are estimates. Check trail conditions and closures before you go. <a href="https://github.com/twinkites/hikenpeep" id="source-link">About and source</a></p>
+        <p class="copyright">© <span id="year">2026</span> <a href="https://twinkites.com" target="_blank" rel="noopener">Twin Kites LLC</a></p>
+      </footer>
+    </aside>
+    <main class="map-wrap">
+      <div id="map" aria-label="Map of predicted fall color and trails"></div>
+      <div class="legend" aria-hidden="true" id="legend"></div>
+      <div id="loading" class="loading" role="status">Loading the forecast…</div>
+    </main>
+  </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="maple" viewBox="0 0 64 64">
+        <path fill="currentColor" d="M32 3l4 12 8-4-2 12 12-4-4 10 11 3-12 8 4 6-14-2-5 8v10h-4V54l-5-8-14 2 4-6-12-8 11-3-4-10 12 4-2-12 8 4z"/>
+      </symbol>
+    </defs>
+  </svg>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
