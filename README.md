@@ -1,22 +1,17 @@
 # Hike and Peep
 
-A static web app for GitHub Pages that predicts when New England's fall foliage will peak, and the best day to hike each trail to see it.
+Do you like hiking and leaf peeping (AKA going to look at the changing leaves)? 
+
+
+
+Here is a static web app for GitHub Pages that predicts when New England's fall foliage will peak, and provides the best day to hike each trail.
 
 - **Peak map.** A 4 km forecast grid over all six states, colored by stage (mostly green, patchy, near peak, peak, past peak, leaves down) for any day from September 1 to November 20. Tap a spot to see its predicted peak and window. A table gives the outlook for 16 well-known areas.
-- **Hikes.** About 15,000 hikes built from OpenStreetMap, each with a color curve for the season. Sort by color on a chosen day, or by the best day in the next two weeks once rain, cloud cover and weekend crowds are counted. Each hike shows its window, where the summit and trailhead differ, distance, climb, surface, forest type and views, with links for directions, AllTrails search and OpenStreetMap. Forty-three classic foliage hikes are starred.
-- **Grandma mode.** Bigger type, and only short or flat walks with easy surfaces, about 970 drive-up overlooks and 21 scenic drives. Benches, restrooms, parking, loops and wheelchair access are shown for each walk.
+- **Hikes.** About 15,000 hikes built from OpenStreetMap, each with a color curve for the season. Sort by color on a chosen day, or by the best day in the next two weeks once rain, cloud cover and weekend crowds are counted. Each hike shows its window, where the summit and trailhead differ, distance, climb, surface, forest type and views, with links for directions, AllTrails search (which honestly is a much better interface, please use them!) and OpenStreetMap. Forty-three classic foliage hikes are starred.
+- **Grandma mode.** Bigger type, and only short or flat walks with easy surfaces, about 970 drive-up overlooks and 21 scenic drives. Benches, restrooms, parking, loops and wheelchair access are shown for each walk. For that extra special grandma in your life. 
 - **Color reports.** Anyone with a GitHub account can report what the leaves look like. Each report becomes an issue, and reports from the last 12 days nudge the forecast nearby.
 
 Everything the browser needs is in `data/`. A nightly GitHub Action refreshes the weather and reports. A monthly one rebuilds trails and refits the model.
-
-## Deploy to GitHub Pages
-
-1. Push this folder to a GitHub repository (the site assumes `twinkites/hikenpeep`; change `js/config.js` if you use another).
-2. In the repo, open **Settings → Pages**, choose **Deploy from a branch**, then select `main` and `/ (root)`.
-3. Create an issue label called `foliage-report` (**Issues → Labels**) so the report form can tag issues.
-4. Open **Actions** and enable workflows. The nightly job runs at about 5 am Eastern; run it once by hand to check it.
-
-To run it locally, serve the folder with any static server (`python3 -m http.server`) and open `http://localhost:8000`.
 
 ## How the forecast works
 
@@ -84,7 +79,7 @@ tests/model.test.mjs       model sanity checks (node --test tests/)
 
 ## Why not AllTrails?
 
-AllTrails has no public API, and its terms don't allow scraping. Hike and Peep builds its own trail data from OpenStreetMap, and each trail links to an AllTrails search so you can read recent reviews there.
+AllTrails has no public API, and its terms don't allow scraping. Hike and Peep builds its own trail data from OpenStreetMap, and each trail links to an AllTrails search so you can read recent reviews there. We love using Alltrails, and hope you use them.
 
 ## Credits
 
