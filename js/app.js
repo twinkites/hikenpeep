@@ -3,6 +3,7 @@ import {
   peepScore, weatherFactor, crowdFactor, envFor, makeReports, makeAgency, combine,
 } from './model.js';
 import { REPO } from './config.js';
+import { photoFor, cachedPhoto } from './photos.js';
 
 const $ = sel => document.querySelector(sel);
 const PAGE = 40;
@@ -237,17 +238,65 @@ map.on('zoomend', () => {
 
 function buildMarkers() {
   for (const it of items) {
-    it.marker = L.circleMarker([it.lat, it.lon], { ...markerStyle(it), renderer });
+    it.marker = L.circleMarker([it.lat, it.lon], { ...markerStyle(it), renderer, bubblingMouseEvents: false });
     if (it.kind === 'drive' && it.line) {
       // the route itself, colored by stage; the dot marks where it starts
-      it.route = L.polyline(decodePolyline(it.line), { renderer, weight: 5, opacity: 0.85, color: markerStyle(it).fillColor });
-      it.route.on('click', () => { selectTab($('#tab-hikes')); openDetail(it); });
-      it.route.bindTooltip(`${esc(it.n)} · scenic drive`, { sticky: true });
+      it.route = L.polyline(decodePolyline(it.line), { renderer, weight: 5, opacity: 0.85, color: markerStyle(it).fillColor, bubblingMouseEvents: false });
+      it.route.on('click', e => { L.DomEvent.stop(e); it.marker.openPopup(); });
+      withPhotoTooltip(it, it.route, { sticky: true });
     }
-    it.marker.bindTooltip(() => `<div class="pop"><b>${esc(it.n)}</b><span>${esc(kindLabel(it))} · ${esc(stageOf(day - it.win.peak)[1])}</span></div>`, { direction: 'top', offset: [0, -4] });
-    it.marker.on('click', () => { selectTab($('#tab-hikes')); openDetail(it); });
+    withPhotoTooltip(it, it.marker, { direction: 'top', offset: [0, -4] });
+    it.marker.bindPopup(() => popupHTML(it), { maxWidth: 300, minWidth: 260, autoPanPadding: [20, 20], autoPanPaddingBottomRight: [20, 70] });
+    it.marker.on('popupopen', e => {
+      it.marker.closeTooltip(); it.route?.closeTooltip();
+      const el = e.popup.getElement();
+      el.querySelector('[data-detail]').onclick = () => { map.closePopup(); selectTab($('#tab-hikes')); openDetail(it); };
+      if (cachedPhoto(it) === undefined) photoFor(it).then(() => { if (e.popup.isOpen()) e.popup.update(); });
+    });
   }
   placeMarkers();
+}
+
+// Hovering shows the name, stage and (once found) a photo. Tooltips can't hold links, so
+// a click opens a popup with the photo credit, Google Maps and the full details.
+function withPhotoTooltip(it, layer, opts) {
+  layer.bindTooltip(() => tooltipHTML(it), { ...opts, className: 'photo-tip', opacity: 1 });
+  let timer;
+  layer.on('tooltipopen', e => {
+    if (cachedPhoto(it) !== undefined) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => photoFor(it).then(p => { if (p && e.tooltip.isOpen()) e.tooltip.update(); }), 200);
+  });
+  layer.on('tooltipclose', () => clearTimeout(timer));
+}
+
+function photoHTML(p, linked) {
+  if (!p) return '';
+  const credit = esc(p.credit || 'Wikimedia Commons');
+  return `<figure class="pop-photo"><img src="${esc(p.src)}" alt="${esc(p.title)}" width="260" height="146" decoding="async">
+    <figcaption>${linked ? `<a href="${esc(p.page)}" target="_blank" rel="noopener">${credit}</a>` : credit} · Wikimedia Commons</figcaption></figure>`;
+}
+
+function tooltipHTML(it) {
+  return `<div class="pop">${photoHTML(cachedPhoto(it), false)}<b>${esc(it.ft?.title || it.n)}</b>
+    <span>${esc(kindLabel(it))} · ${esc(stageOf(day - it.win.peak)[1])}</span></div>`;
+}
+
+function popupHTML(it) {
+  const w = it.win;
+  const p = cachedPhoto(it);
+  return `<div class="pop">${p === undefined ? '<div class="pop-photo loading-photo">Looking for a photo…</div>' : photoHTML(p, true)}
+    <b>${esc(it.ft?.title || it.n)}</b>
+    <span>${esc(kindLabel(it))}${it.park ? ` · ${esc(it.park)}` : ''} · ${esc(stageOf(day - it.win.peak)[1])} on ${fmtDate(dateOf(day, year))}</span>
+    <p>Peak around <b>${fmtDate(dateOf(w.peak, year))}</b> (${fmtDate(dateOf(w.from, year))}–${fmtDate(dateOf(w.to, year))})</p>
+    <div class="pop-links">
+      <a class="primary button" href="${mapsURL(it)}" target="_blank" rel="noopener">Open in Google Maps</a>
+      <button class="secondary" data-detail>Details and best days</button>
+    </div></div>`;
+}
+
+function mapsURL(it) {
+  return `https://www.google.com/maps/search/?api=1&query=${it.lat},${it.lon}`;
 }
 
 function placeMarkers() {
@@ -705,6 +754,7 @@ function renderDetail(it) {
       <button class="ghost back" id="back">← Back to the list</button>
       <h2>${esc(name)}</h2>
       <p class="where">${esc(where)}</p>
+      <div id="detail-photo">${photoHTML(cachedPhoto(it), true)}</div>
       ${it.ft ? `<p class="blurb">${esc(it.ft.blurb)}</p>` : it.blurb ? `<p class="blurb">${esc(it.blurb)}</p>` : ''}
       ${grandma && (it.ft?.gnote || it.note) ? `<p class="gnote">${esc(it.ft?.gnote || it.note)}</p>` : ''}
       <div class="verdict">
@@ -723,6 +773,7 @@ function renderDetail(it) {
       <p class="note">${it.kind === 'trail' ? 'Built from OpenStreetMap trail segments with this name; distance and climb are estimates. ' : ''}Check conditions, closures and parking before you go.</p>
     </div>`;
   $('#back').onclick = closeDetail;
+  if (cachedPhoto(it) === undefined) photoFor(it).then(p => { if (selected === it && p) $('#detail-photo').innerHTML = photoHTML(p, true); });
 }
 
 const SURFACE = { paved: 'Paved', smooth: 'Gravel or packed', natural: 'Dirt', rough: 'Rocky or rough', steps: 'Steps', unknown: 'Not mapped' };

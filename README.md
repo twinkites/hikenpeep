@@ -63,6 +63,7 @@ index.html                 page
 css/style.css              styles
 js/app.js                  map, outlook, hike list, detail view, grandma mode
 js/model.js                the foliage model (pure functions)
+js/photos.js               finds a Wikimedia Commons photo for a place, on demand
 js/config.js               GitHub repo for color reports
 img/twinkites-logo.png     Twin Kites mark (used as a CSS mask so it follows the theme)
 data/                      everything the page loads (written by the pipeline)
@@ -83,6 +84,6 @@ AllTrails has no public API, and its terms don't allow scraping. Hike and Peep b
 
 ## Credits
 
-Trails, parks and points of interest © OpenStreetMap contributors (ODbL), via Geofabrik. Base map © OpenStreetMap contributors. Forest type groups: USDA Forest Service FIA BIGMAP. Elevation: Terrain Tiles on AWS (USGS 3DEP and others). Weather: Open-Meteo (CC BY 4.0), including ERA5 reanalysis. Massachusetts foliage forecast: Department of Conservation and Recreation. Phenology: USA National Phenology Network. Driving routes: OSRM. State outlines: US Census Bureau TIGERweb. Place search by Nominatim.
+Trails, parks and points of interest © OpenStreetMap contributors (ODbL), via Geofabrik. Base map © OpenStreetMap contributors. Forest type groups: USDA Forest Service FIA BIGMAP. Elevation: Terrain Tiles on AWS (USGS 3DEP and others). Weather: Open-Meteo (CC BY 4.0), including ERA5 reanalysis. Massachusetts foliage forecast: Department of Conservation and Recreation. Phenology: USA National Phenology Network. Photos: Wikimedia Commons contributors (each credited with its license). Driving routes: OSRM. State outlines: US Census Bureau TIGERweb. Place search by Nominatim.
 
 © Twin Kites LLC, [twinkites.com](https://twinkites.com)

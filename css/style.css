@@ -385,8 +385,20 @@ body.grandma .hike-only { display: none !important; }
 .leaflet-container { font: inherit; background: var(--bark); }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--paper); color: var(--ink); }
 .leaflet-popup-content { margin: 10px 12px; font-size: 13.5px; }
-.pop b { display: block; font-size: 14px; }
+.pop > b { display: block; font-size: 14px; }
 .pop span { color: var(--ink-soft); }
+.pop p { margin: 6px 0 0; }
+.leaflet-tooltip.photo-tip { background: var(--paper); color: var(--ink); border-color: var(--line); padding: 8px 10px; max-width: 280px; white-space: normal; }
+.leaflet-tooltip-top.photo-tip::before { border-top-color: var(--paper); }
+.pop-photo { margin: 0 0 8px; width: 260px; max-width: 100%; }
+.pop-photo img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; background: var(--line); }
+.pop-photo figcaption { font-size: 11px; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
+.pop-photo figcaption a { color: inherit; }
+.loading-photo { aspect-ratio: 16 / 9; display: grid; place-items: center; border-radius: 4px; background: var(--line); color: var(--ink-soft); font-size: 12px; }
+.pop-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.pop-links .button, .pop-links button { padding: 9px 11px; font-size: 13px; }
+.leaflet-popup-content a.primary { color: var(--paper); }
+#detail-photo .pop-photo { width: 100%; margin: 4px 0 12px; }
 .leaflet-control-layers { background: var(--paper); color: var(--ink); }
 .foliage { image-rendering: auto; }
 .leaflet-tile-pane { filter: saturate(0.25) contrast(0.92) brightness(1.06); }
